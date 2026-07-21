@@ -57,7 +57,7 @@ uciadd() {
 		zone="docker"
 	}
 
-	/etc/init.d/dockerd running && {
+	procd_running dockerd && {
 		echo "Please stop dockerd service first"
 		exit 0
 	}
@@ -117,7 +117,7 @@ ucidel() {
 		zone="docker"
 	}
 
-	/etc/init.d/dockerd running && {
+	procd_running dockerd && {
 		echo "Please stop dockerd service first"
 		exit 0
 	}
@@ -281,7 +281,7 @@ iptables_add_blocking_rule() {
 }
 
 stop_service() {
-	if /etc/init.d/dockerd running; then
+	if procd_running dockerd; then
 		service_stop "/usr/bin/dockerd"
 	fi
 }
