@@ -1,6 +1,6 @@
 #!/bin/sh
 
-/etc/init.d/dockerd uciadd
+DOCKERD_UCI_NO_RELOAD=1 /etc/init.d/dockerd uciadd
 
 rm -rf /tmp/luci-*
 exit 0

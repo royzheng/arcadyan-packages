@@ -1,0 +1,59 @@
+#!/bin/sh /etc/rc.common
+
+START=01
+
+LOG_SOURCE="/opt/log"
+LOG_TARGET="/var/log"
+LOG_MARKER=".fg360-persistent-logging"
+
+validated_user_data_mount() {
+	local mount_source
+
+	mount_source="$(awk '$2 == "/opt" && $3 == "ext4" { print $1; exit }' /proc/mounts)"
+	case "$mount_source" in
+		/dev/mmcblk0p46|/dev/block/user_data) return 0 ;;
+	esac
+	return 1
+}
+
+same_marker() {
+	local source_id target_id
+
+	source_id="$(stat -c '%d:%i' "$LOG_SOURCE/$LOG_MARKER" 2>/dev/null)"
+	target_id="$(stat -c '%d:%i' "$LOG_TARGET/$LOG_MARKER" 2>/dev/null)"
+	[ -n "$source_id" ] && [ "$source_id" = "$target_id" ]
+}
+
+start() {
+	local current_mount
+
+	if ! validated_user_data_mount; then
+		logger -t fg360-persistent-logging -p daemon.err \
+			"refusing persistent logs: /opt is not validated p46 user_data"
+		return 1
+	fi
+
+	mkdir -p "$LOG_SOURCE/openclash" "$LOG_SOURCE/ddns" "$LOG_TARGET" || return 1
+	touch "$LOG_SOURCE/$LOG_MARKER" || return 1
+
+	current_mount="$(awk '$2 == "/var/log" { print $1; exit }' /proc/mounts)"
+	if [ -n "$current_mount" ]; then
+		if same_marker; then
+			return 0
+		fi
+		logger -t fg360-persistent-logging -p daemon.err \
+			"refusing persistent logs: /var/log already has an unexpected mount"
+		return 1
+	fi
+
+	mount -o bind "$LOG_SOURCE" "$LOG_TARGET" || return 1
+	if ! same_marker; then
+		umount "$LOG_TARGET" 2>/dev/null
+		logger -t fg360-persistent-logging -p daemon.err \
+			"persistent /var/log bind verification failed"
+		return 1
+	fi
+
+	logger -t fg360-persistent-logging -p daemon.notice \
+		"persistent /var/log mounted from validated user_data"
+}

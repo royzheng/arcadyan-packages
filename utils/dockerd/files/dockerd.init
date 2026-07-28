@@ -50,6 +50,9 @@ uciadd() {
 	local iface="${1}"
 	local device="${2}"
 	local zone="${3}"
+	local network_changed=0
+	local firewall_changed=0
+	local zone_networks
 
 	[ -z "${iface}" ] && {
 		iface="docker"
@@ -70,7 +73,7 @@ uciadd() {
 		uci_quiet set network.@interface[-1].device="${device}"
 		uci_quiet set network.@interface[-1].proto="none"
 		uci_quiet set network.@interface[-1].auto="0"
-		uci_quiet commit network
+		network_changed=1
 	fi
 
 	# Add docker bridge device
@@ -79,7 +82,7 @@ uciadd() {
 		uci_quiet add network device
 		uci_quiet set network.@device[-1].type="bridge"
 		uci_quiet set network.@device[-1].name="${device}"
-		uci_quiet commit network
+		network_changed=1
 	else
 		logger -t "dockerd-init" -p notice "Bridge device '${device}' already defined in network config"
 	fi
@@ -93,17 +96,27 @@ uciadd() {
 		uci_quiet set firewall.@zone[-1].output="ACCEPT"
 		uci_quiet set firewall.@zone[-1].forward="ACCEPT"
 		uci_quiet set firewall.@zone[-1].name="${zone}"
-		uci_quiet commit firewall
+		firewall_changed=1
 	fi
 
 	# Add interface to firewall zone
 	if uci_quiet get firewall.${zone}; then
-		uci_quiet del_list firewall.${zone}.network="${iface}"
-		uci_quiet add_list firewall.${zone}.network="${iface}"
-		uci_quiet commit firewall
+		zone_networks="$(uci -q get firewall.${zone}.network 2>/dev/null)"
+		case " ${zone_networks} " in
+			*" ${iface} "*) ;;
+			*)
+				uci_quiet add_list firewall.${zone}.network="${iface}"
+				firewall_changed=1
+				;;
+		esac
 	fi
 
-	reload_config
+	[ "${network_changed}" -eq 0 ] || uci_quiet commit network
+	[ "${firewall_changed}" -eq 0 ] || uci_quiet commit firewall
+
+	if [ "${network_changed}" -ne 0 ] || [ "${firewall_changed}" -ne 0 ]; then
+		[ "${DOCKERD_UCI_NO_RELOAD:-0}" = "1" ] || reload_config
+	fi
 }
 
 ucidel() {
@@ -213,7 +226,34 @@ process_config() {
 }
 
 start_service() {
-	local nofile=$(cat /proc/sys/fs/nr_open)
+	local nofile data_root user_data_link user_data_source
+
+	nofile="$(cat /proc/sys/fs/nr_open)"
+	config_load 'dockerd'
+	config_get data_root globals data_root "/opt/docker/"
+	data_root="${data_root%/}"
+	user_data_link="$(readlink /dev/block/user_data 2>/dev/null)"
+	user_data_source="$(awk '$2 == "/opt" && $3 == "ext4" { print $1; exit }' /proc/mounts)"
+
+	# FG360_DOCKER_STORAGE_REQUIRED=1
+	if [ "$data_root" != "/opt/docker" ] || \
+		[ "$user_data_link" != "/dev/mmcblk0p46" ] || \
+		! grep -qx 'PARTNAME=user_data' /sys/class/block/mmcblk0p46/uevent 2>/dev/null; then
+		logger -t dockerd-init -p daemon.err \
+			"refusing to start: dockerd data-root must be /opt/docker on p46 user_data"
+		return 1
+	fi
+
+	case "$user_data_source" in
+		/dev/mmcblk0p46|/dev/block/user_data) ;;
+		*)
+			logger -t dockerd-init -p daemon.err \
+				"refusing to start: /opt is not the p46 ext4 mount"
+			return 1
+			;;
+	esac
+
+	[ -d "$data_root" ] || mkdir -p "$data_root" || return 1
 
 	process_config
 

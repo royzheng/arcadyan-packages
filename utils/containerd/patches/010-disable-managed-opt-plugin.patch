@@ -1,0 +1,16 @@
+From: Arcadyan FG360 build <noreply@example.invalid>
+Subject: [PATCH] containerd: disable the managed opt plugin
+
+The managed opt plugin creates /opt/containerd/bin and
+/opt/containerd/lib and prepends them to PATH and LD_LIBRARY_PATH.  The
+FG360 installs its runtime and shim through opkg and reserves /opt as the
+user_data mount, so this optional binary-image installation mechanism is
+not used.
+
+Keep ctr and the client install API intact, but do not register the opt
+service in the containerd daemon.
+
+--- a/cmd/containerd/builtins/builtins.go
++++ b/cmd/containerd/builtins/builtins.go
+@@ -42 +41,0 @@ import (
+-	_ "github.com/containerd/containerd/v2/plugins/services/opt"

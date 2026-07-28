@@ -1,0 +1,39 @@
+#!/bin/sh
+
+LOG_ROOT="/opt/log"
+mount_source="$(awk '$2 == "/opt" && $3 == "ext4" { print $1; exit }' /proc/mounts)"
+case "$mount_source" in
+	/dev/mmcblk0p46|/dev/block/user_data) ;;
+	*)
+		logger -t fg360-persistent-logging -p daemon.err \
+			"deferring defaults: validated user_data is not mounted"
+		exit 1
+		;;
+esac
+
+mkdir -p "$LOG_ROOT/advanced" "$LOG_ROOT/openclash" \
+	"$LOG_ROOT/ddns" /etc/crontabs || exit 1
+
+uci -q set system.@system[0].ap_start='1' &&
+	uci -q set system.@system[0].ap_auto_logging='1' &&
+	uci -q set system.@system[0].ap_save_mode='1' &&
+	uci -q set system.@system[0].ap_max_files='16' &&
+	uci -q set system.@system[0].ap_max_bootlog_folders='8' &&
+	uci -q set system.@system[0].log_store_path="$LOG_ROOT/advanced" &&
+	uci -q set system.@system[0].log_size='2048' &&
+	uci -q set system.@system[0].enable_sensitive_log='0' &&
+	uci -q set system.@system[0].gps_start='0' &&
+	uci -q set system.@system[0].net_start='0' &&
+	uci -q set system.@system[0].md_start='0' &&
+	uci -q set system.@system[0].md_save_mode='0' &&
+	uci -q set system.@system[0].md_gps_location_log_enable='0' &&
+	uci -q set system.@system[0].md_dumpback_mode='0' &&
+	uci -q set system.@system[0].md_flush_pls_log='0' &&
+	uci -q commit system || exit 1
+
+cron_line='17 * * * * /usr/sbin/logrotate -s /opt/log/logrotate.status /etc/logrotate.conf'
+touch /etc/crontabs/root || exit 1
+grep -Fqx "$cron_line" /etc/crontabs/root 2>/dev/null ||
+	printf '%s\n' "$cron_line" >> /etc/crontabs/root || exit 1
+
+exit 0

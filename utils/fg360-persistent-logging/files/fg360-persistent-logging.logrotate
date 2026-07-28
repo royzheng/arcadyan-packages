@@ -1,0 +1,9 @@
+/var/log/messages /var/log/*.log /var/log/ddns/*.log /var/log/openclash/*.log {
+	size 5M
+	rotate 8
+	compress
+	delaycompress
+	copytruncate
+	missingok
+	notifempty
+}
