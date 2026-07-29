@@ -17,11 +17,21 @@ validated_user_data_mount() {
 }
 
 same_marker() {
-	local source_id target_id
+	local source_marker target_marker
 
-	source_id="$(stat -c '%d:%i' "$LOG_SOURCE/$LOG_MARKER" 2>/dev/null)"
-	target_id="$(stat -c '%d:%i' "$LOG_TARGET/$LOG_MARKER" 2>/dev/null)"
-	[ -n "$source_id" ] && [ "$source_id" = "$target_id" ]
+	[ -r "$LOG_SOURCE/$LOG_MARKER" ] || return 1
+	[ -r "$LOG_TARGET/$LOG_MARKER" ] || return 1
+	IFS= read -r source_marker < "$LOG_SOURCE/$LOG_MARKER" || return 1
+	IFS= read -r target_marker < "$LOG_TARGET/$LOG_MARKER" || return 1
+	[ -n "$source_marker" ] && [ "$source_marker" = "$target_marker" ]
+}
+
+write_marker() {
+	local boot_id
+
+	IFS= read -r boot_id < /proc/sys/kernel/random/boot_id || return 1
+	[ -n "$boot_id" ] || return 1
+	printf '%s\n' "$boot_id" > "$LOG_SOURCE/$LOG_MARKER"
 }
 
 start() {
@@ -34,7 +44,7 @@ start() {
 	fi
 
 	mkdir -p "$LOG_SOURCE/openclash" "$LOG_SOURCE/ddns" "$LOG_TARGET" || return 1
-	touch "$LOG_SOURCE/$LOG_MARKER" || return 1
+	write_marker || return 1
 
 	current_mount="$(awk '$2 == "/var/log" { print $1; exit }' /proc/mounts)"
 	if [ -n "$current_mount" ]; then

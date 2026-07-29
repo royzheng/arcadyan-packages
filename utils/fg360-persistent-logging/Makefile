@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=fg360-persistent-logging
 PKG_VERSION:=1
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 PKGARCH:=all
 PKG_LICENSE:=GPL-2.0
 PKG_MAINTAINER:=royzheng
