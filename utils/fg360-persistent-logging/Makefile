@@ -2,7 +2,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=fg360-persistent-logging
 PKG_VERSION:=1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 PKGARCH:=all
 PKG_LICENSE:=GPL-2.0
 PKG_MAINTAINER:=royzheng
@@ -24,6 +24,9 @@ endef
 
 define Package/fg360-persistent-logging/conffiles
 /etc/logrotate.d/fg360-persistent-logging
+endef
+
+define Build/Compile
 endef
 
 define Package/fg360-persistent-logging/install
