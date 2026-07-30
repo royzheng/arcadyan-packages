@@ -918,8 +918,11 @@ get_local_ip () {
 			network_flush_cache	# force re-read data from ubus
 			[ $use_ipv6 -eq 0 ] && __RUNPROG="network_get_ipaddr" \
 					    || __RUNPROG="network_get_ipaddr6"
-			eval "$__RUNPROG __DATA $ip_network" || \
-				write_log 13 "Can not detect local IP using $__RUNPROG '$ip_network' - Error: '$?'"
+			__DATA=""
+			eval "$__RUNPROG __DATA $ip_network"
+			__ERR=$?
+			[ $__ERR -ne 0 ] && \
+				write_log 3 "Can not detect local IP using $__RUNPROG '$ip_network' - Error: '$__ERR'"
 			[ -n "$__DATA" ] && write_log 7 "Local IP '$__DATA' detected on network '$ip_network'"
 		elif [ -n "$ip_interface" ]; then
 			local __DATA4=""; local __DATA6=""
