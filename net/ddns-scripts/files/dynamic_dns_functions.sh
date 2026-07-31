@@ -207,8 +207,7 @@ stop_section_processes() {
 
 # stop updater script for all defines sections or only for one given
 # $1 = interface (optional)
-# used by /etc/hotplug.d/iface/95-ddns on 'ifdown'
-# and by /etc/init.d/ddns stop
+# used by explicit updater stop requests and /etc/init.d/ddns stop
 # needed because we also need to kill "sleep" child processes
 stop_daemon_for_all_ddns_sections() {
 	local __EVENTIF="$1"
